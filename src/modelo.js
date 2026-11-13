@@ -1,23 +1,8 @@
-/**
- * MODELO · Notas del semestre                                            (PARTE 2 de la guía)
- *
- * SABE: qué es una evaluación, las reglas (pesos, rangos, nota mínima) y cómo se calcula el resumen.
- * NO SABE: que existe una pantalla, el DOM, localStorage, alert()... Por eso se prueba sin navegador.
- *
- * Se comunica con el resto SIN conocerlo: avisa de sus cambios con el patrón Observer (suscribir).
- *
- * Tu trabajo: reemplazar cada "TODO" por código real hasta que `npm run test:modelo` quede en verde.
- * Las reglas exactas y los mensajes de error están en la guía (Parte 2) y en pruebas/modelo.pruebas.js.
- */
-
-export const NOTA_MINIMA = 3.0; // para aprobar
+export const NOTA_MINIMA = 3.0;
 export const NOTA_MAXIMA = 5.0;
-export const UMBRAL_RIESGO = 4.0; // si necesitas más que esto en lo que falta, estás "en riesgo"
-export const MAX_NOMBRE = 40;
+export const UMBRAL_RIESGO = 4.0;
+export const EPS = 1e-9;
 
-const EPS = 1e-9; // tolerancia para comparar decimales (0.1 + 0.2 no es exactamente 0.3 en un computador)
-
-/** Error de negocio: su mensaje se puede mostrar tal cual al usuario. */
 export class ErrorDeReglas extends Error {
   constructor(mensaje) {
     super(mensaje);
@@ -25,65 +10,126 @@ export class ErrorDeReglas extends Error {
   }
 }
 
-/** Ayuda ya escrita: redondea hacia ARRIBA (la nota que "necesitas" nunca debe quedarse corta). */
-const redondearArriba = (valor, decimales = 2) => {
-  const f = 10 ** decimales;
-  return Math.ceil(valor * f - EPS) / f;
-};
-
 export class NotasModelo {
-  #almacen;
   #evaluaciones;
-  #siguienteId;
   #suscriptores = new Set();
+  #siguienteId = 1;
+  #almacen;
 
-  // Ya escrito: recibe el almacén (no sabe cuál es), carga lo guardado y calcula el próximo id.
   constructor(almacen) {
     this.#almacen = almacen;
-    this.#evaluaciones = almacen.cargar();
-    this.#siguienteId = this.#evaluaciones.reduce((max, e) => Math.max(max, e.id), 0) + 1;
+    const cargados = this.#almacen.cargar();
+    this.#evaluaciones = cargados ? cargados.map(e => ({ ...e })) : [];
+    
+    if (this.#evaluaciones.length > 0) {
+      this.#siguienteId = Math.max(...this.#evaluaciones.map(e => e.id)) + 1;
+    }
   }
 
-  // Ya escrito: devuelve COPIAS, para que nadie cambie el estado interno saltándose las reglas.
-  get evaluaciones() {
-    return this.#evaluaciones.map((e) => ({ ...e }));
-  }
-
-  // ---------------------------------------------------------------- 2A · Agregar y validar
   agregar({ nombre, peso, nota = null }) {
-    // TODO 2A: valida, EN ESTE ORDEN: nombre, peso, nota y suma de pesos (mensajes en la guía).
-    //          Si todo está bien: crea { id, nombre, peso, nota }, agrégalo y llama a this.#cambio().
-    //          Si algo está mal: lanza new ErrorDeReglas('...') SIN cambiar nada.
-    throw new Error('TODO 2A · agregar()');
+    nombre = String(nombre ?? '').trim();
+    if (!nombre) throw new ErrorDeReglas('El nombre es obligatorio.');
+    if (nombre.length > 40) throw new ErrorDeReglas('El nombre no puede superar 40 caracteres.');
+    
+    // Parte 5A: Regla nueva de nombres únicos
+    if (this.#evaluaciones.some(e => e.nombre.toLowerCase() === nombre.toLowerCase())) {
+        throw new ErrorDeReglas('Ya existe una evaluación con ese nombre.');
+    }
+
+    peso = Number(peso);
+    if (!Number.isFinite(peso) || peso < 1 || peso > 100) {
+      throw new ErrorDeReglas('El peso debe estar entre 1 y 100.');
+    }
+
+    if (nota !== null && nota !== '') {
+      nota = Number(nota);
+      if (!Number.isFinite(nota) || nota < 0 || nota > 5) {
+        throw new ErrorDeReglas('La nota debe estar entre 0 y 5.');
+      }
+    } else {
+      nota = null;
+    }
+
+    const pesosActuales = this.#evaluaciones.reduce((sum, ev) => sum + ev.peso, 0);
+    if (pesosActuales + peso > 100) {
+      throw new ErrorDeReglas(`Los pesos no pueden sumar más de 100 % (te quedan ${100 - pesosActuales} %).`);
+    }
+
+    const id = this.#siguienteId++;
+    this.#evaluaciones.push({ id, nombre, peso, nota });
+    this.#cambio();
   }
 
-  // ---------------------------------------------------------------- 2B · Calificar y eliminar
   calificar(id, nota) {
-    // TODO 2B: la nota puede ser null (quitar) o un número entre 0 y 5. Si el id no existe → ErrorDeReglas.
-    throw new Error('TODO 2B · calificar()');
+    const evalIndex = this.#evaluaciones.findIndex(e => e.id === id);
+    if (evalIndex === -1) throw new ErrorDeReglas('No existe la evaluación.');
+
+    if (nota !== null && nota !== '') {
+      nota = Number(nota);
+      if (!Number.isFinite(nota) || nota < 0 || nota > 5) {
+        throw new ErrorDeReglas('La nota debe estar entre 0 y 5.');
+      }
+    } else {
+      nota = null;
+    }
+
+    this.#evaluaciones[evalIndex].nota = nota;
+    this.#cambio();
   }
 
   eliminar(id) {
-    // TODO 2B: quita la evaluación. Si el id no existe → ErrorDeReglas.
-    throw new Error('TODO 2B · eliminar()');
+    const evalIndex = this.#evaluaciones.findIndex(e => e.id === id);
+    if (evalIndex === -1) throw new ErrorDeReglas('No existe la evaluación.');
+    
+    this.#evaluaciones.splice(evalIndex, 1);
+    this.#cambio();
   }
 
-  // ---------------------------------------------------------------- 2C · Resumen
+  get evaluaciones() {
+    return this.#evaluaciones.map(e => ({ ...e }));
+  }
+
   resumen() {
-    // TODO 2C: devuelve { acumulado, pesoCalificado, pesoPendiente, notaNecesaria, estado }.
-    //          Usa NOTA_MINIMA, NOTA_MAXIMA, UMBRAL_RIESGO, EPS y redondearArriba (ya están arriba).
-    throw new Error('TODO 2C · resumen()');
+    let pesoCalificado = 0;
+    let acumulado = 0;
+
+    for (const ev of this.#evaluaciones) {
+      if (ev.nota !== null) {
+        pesoCalificado += ev.peso;
+        acumulado += (ev.peso * ev.nota) / 100;
+      }
+    }
+
+    const pesoPendiente = 100 - pesoCalificado;
+    let notaNecesaria = null;
+
+    if (pesoPendiente > 0) {
+      notaNecesaria = (NOTA_MINIMA - acumulado) / (pesoPendiente / 100);
+      if (notaNecesaria < 0) notaNecesaria = 0;
+      notaNecesaria = Math.ceil(notaNecesaria * 100) / 100;
+    }
+
+    let estado;
+    if (acumulado >= NOTA_MINIMA - EPS) {
+      estado = 'aprobado';
+    } else if (notaNecesaria === null || notaNecesaria > NOTA_MAXIMA) {
+      estado = 'imposible';
+    } else if (notaNecesaria > UMBRAL_RIESGO) {
+      estado = 'en-riesgo';
+    } else {
+      estado = 'en-camino';
+    }
+
+    return { acumulado, pesoCalificado, pesoPendiente, notaNecesaria, estado };
   }
 
-  // ---------------------------------------------------------------- 2D · Observer y persistencia
-  suscribir(suscriptor) {
-    // TODO 2D: guarda el suscriptor y devuelve una función que lo cancele.
-    throw new Error('TODO 2D · suscribir()');
+  suscribir(fn) {
+    this.#suscriptores.add(fn);
+    return () => this.#suscriptores.delete(fn);
   }
 
   #cambio() {
-    // TODO 2D: después de CADA cambio: guarda en el almacén (this.#almacen.guardar(...)) y avisa a los suscriptores.
+    this.#almacen.guardar(this.#evaluaciones);
+    this.#suscriptores.forEach(fn => fn());
   }
-
-  // Puedes agregar aquí los métodos privados que necesites (por ejemplo #buscar(id) o #validarNota(nota)).
 }

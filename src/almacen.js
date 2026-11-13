@@ -1,47 +1,49 @@
-// ALMACÉN: dónde se guardan las evaluaciones.
-//
-// El Modelo no sabe si los datos viven en memoria, en localStorage o en un servidor:
-// solo exige que el almacén tenga estos dos métodos (un "contrato"):
-//
-//     cargar()              → devuelve la lista de evaluaciones guardadas
-//     guardar(evaluaciones) → reemplaza lo guardado por esta lista
-//
-// Cualquier clase con esos dos métodos sirve. En la Parte 5C crearás una más.
-
-/** Guarda en memoria: se pierde al recargar la página. Ideal para las pruebas. */
 export class AlmacenMemoria {
   #datos;
 
-  constructor(datosIniciales = []) {
-    this.#datos = structuredClone(datosIniciales);
+  constructor(datos = null) {
+    this.#datos = datos;
   }
 
   cargar() {
-    return structuredClone(this.#datos);
+    return this.#datos;
   }
 
-  guardar(evaluaciones) {
-    this.#datos = structuredClone(evaluaciones);
+  guardar(datos) {
+    this.#datos = datos;
   }
 }
 
-/** Guarda en localStorage del navegador: sobrevive a las recargas. */
 export class AlmacenLocal {
   #clave;
 
-  constructor(clave = 'notas.v1') {
+  constructor(clave) {
     this.#clave = clave;
   }
 
   cargar() {
-    try {
-      return JSON.parse(localStorage.getItem(this.#clave) ?? '[]');
-    } catch {
-      return [];
-    }
+    const guardado = localStorage.getItem(this.#clave);
+    return guardado ? JSON.parse(guardado) : null;
   }
 
-  guardar(evaluaciones) {
-    localStorage.setItem(this.#clave, JSON.stringify(evaluaciones));
+  guardar(datos) {
+    localStorage.setItem(this.#clave, JSON.stringify(datos));
+  }
+}
+
+export class AlmacenSesion {
+  #clave;
+
+  constructor(clave) {
+    this.#clave = clave;
+  }
+
+  cargar() {
+    const guardado = sessionStorage.getItem(this.#clave);
+    return guardado ? JSON.parse(guardado) : null;
+  }
+
+  guardar(datos) {
+    sessionStorage.setItem(this.#clave, JSON.stringify(datos));
   }
 }
